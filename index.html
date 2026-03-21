@@ -58,11 +58,21 @@
     .store-btn-google { background: #4CAF50; }
     .store-btn-apple { background: #2196F3; }
 
-    /* Find Me button */
-    .find-me-btn { display: block; width: 100%; padding: 14px; margin-bottom: 16px; background: #4CAF50; color: #fff; font-size: 16px; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; text-align: center; transition: transform 0.15s, box-shadow 0.15s; }
-    .find-me-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(76,175,80,0.4); }
-    .find-me-btn:active { transform: scale(0.98); }
-    .find-me-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    /* Location picker */
+    .loc-picker { display: flex; gap: 10px; margin-bottom: 16px; align-items: stretch; }
+    .loc-gps-btn { flex-shrink: 0; padding: 12px 16px; background: #4CAF50; color: #fff; font-size: 14px; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap; }
+    .loc-gps-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(76,175,80,0.4); }
+    .loc-gps-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .loc-search { display: flex; flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden; background: #fff; }
+    .loc-search input { flex: 1; border: none; outline: none; padding: 12px 14px; font-size: 14px; color: #1A1A1A; min-width: 0; }
+    .loc-search input::placeholder { color: #9E9E9E; }
+    .loc-search-btn { padding: 12px 16px; background: #4CAF50; color: #fff; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    .loc-search-btn:hover { background: #388E3C; }
+    .loc-search-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    @media (max-width: 480px) {
+      .loc-picker { flex-direction: column; }
+      .loc-gps-btn { text-align: center; }
+    }
 
     /* Loading / empty */
     .loading { text-align: center; padding: 60px 20px; }
@@ -119,7 +129,13 @@
     </div>
 
     <div class="container">
-      <button id="findMeBtn" class="find-me-btn" onclick="handleFindMe()">📍 Find Sales Near Me</button>
+      <div class="loc-picker" id="locPicker">
+        <button id="gpsBtn" class="loc-gps-btn" onclick="handleGps()">📍 Use My Location</button>
+        <div class="loc-search">
+          <input type="text" id="cityInput" placeholder="City, State (e.g. Austin, TX)" onkeydown="if(event.key==='Enter')handleCitySearch()" />
+          <button id="citySearchBtn" class="loc-search-btn" onclick="handleCitySearch()">Search</button>
+        </div>
+      </div>
       <div id="salesList">
         <div class="loading">
           <div class="spinner"></div>
@@ -419,39 +435,42 @@
     }
 
     // -------------------------------------------------------------------------
-    // Cached sales for re-rendering after location grant
+    // Cached sales for re-rendering after location changes
     // -------------------------------------------------------------------------
     let cachedSales = [];
 
+    function setLocationAndRender(lat, lon, label) {
+      userLat = lat;
+      userLon = lon;
+      const statusEl = document.getElementById('locationStatus');
+      statusEl.innerHTML = `<span class="dot dot-green"></span> ${esc(label)}`;
+      if (cachedSales.length > 0) renderSales(cachedSales);
+    }
+
     // -------------------------------------------------------------------------
-    // Find Me button handler
+    // GPS handler
     // -------------------------------------------------------------------------
-    function handleFindMe() {
-      const btn = document.getElementById('findMeBtn');
+    function handleGps() {
+      const btn = document.getElementById('gpsBtn');
       const statusEl = document.getElementById('locationStatus');
 
       if (!navigator.geolocation) {
-        statusEl.innerHTML = '<span class="dot dot-gray"></span> Location unavailable on this browser';
+        statusEl.innerHTML = '<span class="dot dot-gray"></span> GPS not available — try searching a city';
         return;
       }
 
       btn.disabled = true;
-      btn.textContent = '📍 Getting your location...';
+      btn.textContent = '📍 Locating...';
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          userLat = pos.coords.latitude;
-          userLon = pos.coords.longitude;
-          statusEl.innerHTML = '<span class="dot dot-green"></span> Showing sales nearest to you';
-          btn.style.display = 'none';
-          // Re-render with distances
-          if (cachedSales.length > 0) {
-            renderSales(cachedSales);
-          }
+          btn.textContent = '📍 Using GPS';
+          btn.disabled = false;
+          setLocationAndRender(pos.coords.latitude, pos.coords.longitude, 'Showing sales nearest to you');
         },
         () => {
-          statusEl.innerHTML = '<span class="dot dot-gray"></span> Location denied — sorted by date';
-          btn.textContent = '📍 Find Sales Near Me';
+          statusEl.innerHTML = '<span class="dot dot-gray"></span> Location denied — try searching a city';
+          btn.textContent = '📍 Use My Location';
           btn.disabled = false;
         },
         { timeout: 10000, enableHighAccuracy: true }
@@ -459,32 +478,105 @@
     }
 
     // -------------------------------------------------------------------------
-    // Init — fetch sales, show button; auto-hide button if location already granted
+    // City/state search via Open-Meteo geocoding
+    // -------------------------------------------------------------------------
+    // US state abbreviation to full name map for matching
+    const STATE_ABBREVS = {
+      AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',
+      DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',
+      KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',
+      MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',
+      NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',
+      OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',
+      TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+      DC:'District of Columbia'
+    };
+
+    async function handleCitySearch() {
+      const input = document.getElementById('cityInput');
+      const btn = document.getElementById('citySearchBtn');
+      const statusEl = document.getElementById('locationStatus');
+      const raw = input.value.trim();
+
+      if (!raw) { input.focus(); return; }
+
+      // Parse "City, ST" or "City, State" or just "City"
+      const parts = raw.split(',').map(s => s.trim());
+      const cityName = parts[0];
+      const stateRaw = parts[1] || '';
+      // Normalize state to full name for comparison
+      const stateUpper = stateRaw.toUpperCase();
+      const stateFull = STATE_ABBREVS[stateUpper] || stateRaw;
+
+      btn.disabled = true;
+      btn.textContent = '...';
+      statusEl.innerHTML = '<span class="dot dot-gray"></span> Searching...';
+
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=10&language=en&format=json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const results = data.results || [];
+
+        if (results.length === 0) {
+          statusEl.innerHTML = `<span class="dot dot-gray"></span> No results for "${esc(raw)}"`;
+          btn.textContent = 'Search';
+          btn.disabled = false;
+          return;
+        }
+
+        // Filter to US results, then try to match state
+        const usResults = results.filter(r => r.country_code === 'US');
+        let match = null;
+
+        if (stateFull && usResults.length > 0) {
+          // Try matching admin1 (state name) case-insensitively
+          match = usResults.find(r =>
+            (r.admin1 || '').toLowerCase() === stateFull.toLowerCase()
+          );
+        }
+
+        // Fallback: first US result, or first result overall
+        if (!match) match = usResults[0] || results[0];
+
+        const label = `Showing sales near ${match.name}${match.admin1 ? ', ' + match.admin1 : ''}`;
+        setLocationAndRender(match.latitude, match.longitude, label);
+
+        // Update GPS button to show it's not active
+        document.getElementById('gpsBtn').textContent = '📍 Use My Location';
+      } catch (err) {
+        statusEl.innerHTML = '<span class="dot dot-gray"></span> Search failed — try again';
+      }
+
+      btn.textContent = 'Search';
+      btn.disabled = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Init — fetch sales; auto-use GPS if already granted
     // -------------------------------------------------------------------------
     async function init() {
       const statusEl = document.getElementById('locationStatus');
-      const btn = document.getElementById('findMeBtn');
-      statusEl.innerHTML = '<span class="dot dot-gray"></span> Tap the button below to sort by distance';
+      statusEl.innerHTML = '<span class="dot dot-gray"></span> Use GPS or search a city to sort by distance';
 
-      // Check if we already have permission (won't prompt)
+      // Check if we already have location permission (won't prompt)
       if (navigator.permissions && navigator.permissions.query) {
         try {
           const perm = await navigator.permissions.query({ name: 'geolocation' });
           if (perm.state === 'granted') {
-            // Already granted — get location silently
             navigator.geolocation.getCurrentPosition(
               (pos) => {
                 userLat = pos.coords.latitude;
                 userLon = pos.coords.longitude;
                 statusEl.innerHTML = '<span class="dot dot-green"></span> Showing sales nearest to you';
-                btn.style.display = 'none';
+                document.getElementById('gpsBtn').textContent = '📍 Using GPS';
                 if (cachedSales.length > 0) renderSales(cachedSales);
               },
               () => {},
               { timeout: 8000 }
             );
           }
-        } catch (e) { /* permissions API not supported — show button */ }
+        } catch (e) { /* permissions API not supported */ }
       }
 
       try {
