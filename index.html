@@ -58,21 +58,14 @@
     .store-btn-google { background: #4CAF50; }
     .store-btn-apple { background: #2196F3; }
 
-    /* Location picker */
-    .loc-picker { display: flex; gap: 10px; margin-bottom: 16px; align-items: stretch; }
-    .loc-gps-btn { flex-shrink: 0; padding: 12px 16px; background: #4CAF50; color: #fff; font-size: 14px; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap; }
-    .loc-gps-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(76,175,80,0.4); }
-    .loc-gps-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .loc-search { display: flex; flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden; background: #fff; }
-    .loc-search input { flex: 1; border: none; outline: none; padding: 12px 14px; font-size: 14px; color: #1A1A1A; min-width: 0; }
-    .loc-search input::placeholder { color: #9E9E9E; }
-    .loc-search-btn { padding: 12px 16px; background: #4CAF50; color: #fff; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    /* Location search */
+    .loc-search-bar { display: flex; margin-bottom: 8px; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden; background: #fff; }
+    .loc-search-bar input { flex: 1; border: none; outline: none; padding: 14px 16px; font-size: 15px; color: #1A1A1A; min-width: 0; }
+    .loc-search-bar input::placeholder { color: #9E9E9E; }
+    .loc-search-btn { padding: 14px 20px; background: #4CAF50; color: #fff; border: none; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
     .loc-search-btn:hover { background: #388E3C; }
     .loc-search-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    @media (max-width: 480px) {
-      .loc-picker { flex-direction: column; }
-      .loc-gps-btn { text-align: center; }
-    }
+    .loc-error { color: #F44336; font-size: 13px; margin-bottom: 12px; padding: 0 4px; }
 
     /* Loading / empty */
     .loading { text-align: center; padding: 60px 20px; }
@@ -129,13 +122,11 @@
     </div>
 
     <div class="container">
-      <div class="loc-picker" id="locPicker">
-        <button id="gpsBtn" class="loc-gps-btn" onclick="handleGps()">📍 Use My Location</button>
-        <div class="loc-search">
-          <input type="text" id="cityInput" placeholder="City, State (e.g. Austin, TX)" onkeydown="if(event.key==='Enter')handleCitySearch()" />
-          <button id="citySearchBtn" class="loc-search-btn" onclick="handleCitySearch()">Search</button>
-        </div>
+      <div class="loc-search-bar">
+        <input type="text" id="cityInput" placeholder="Enter city, state (e.g. Austin, TX)" onkeydown="if(event.key==='Enter')handleCitySearch()" />
+        <button id="citySearchBtn" class="loc-search-btn" onclick="handleCitySearch()">Search</button>
       </div>
+      <div id="locError" class="loc-error" style="display:none;"></div>
       <div id="salesList">
         <div class="loading">
           <div class="spinner"></div>
@@ -448,42 +439,6 @@
     }
 
     // -------------------------------------------------------------------------
-    // GPS handler
-    // -------------------------------------------------------------------------
-    function handleGps() {
-      // Must call geolocation synchronously in the click handler — no async before this
-      var btn = document.getElementById('gpsBtn');
-      var statusEl = document.getElementById('locationStatus');
-
-      if (!navigator.geolocation) {
-        statusEl.innerHTML = '<span class="dot dot-gray"></span> GPS not available — try searching a city';
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = '📍 Locating...';
-      statusEl.innerHTML = '<span class="dot dot-gray"></span> Getting your location...';
-
-      navigator.geolocation.getCurrentPosition(
-        function(pos) {
-          btn.textContent = '📍 Using GPS';
-          btn.disabled = false;
-          setLocationAndRender(pos.coords.latitude, pos.coords.longitude, 'Showing sales nearest to you');
-        },
-        function(err) {
-          var msg = 'Location failed';
-          if (err.code === 1) msg = 'Permission denied — try searching a city';
-          else if (err.code === 2) msg = 'Position unavailable — try searching a city';
-          else if (err.code === 3) msg = 'Location timed out — try searching a city';
-          statusEl.innerHTML = '<span class="dot dot-gray"></span> ' + msg;
-          btn.textContent = '📍 Use My Location';
-          btn.disabled = false;
-        },
-        { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }
-      );
-    }
-
-    // -------------------------------------------------------------------------
     // City/state search via Open-Meteo geocoding
     // -------------------------------------------------------------------------
     // US state abbreviation to full name map for matching
@@ -502,14 +457,34 @@
       const input = document.getElementById('cityInput');
       const btn = document.getElementById('citySearchBtn');
       const statusEl = document.getElementById('locationStatus');
+      const errorEl = document.getElementById('locError');
       const raw = input.value.trim();
+
+      // Hide previous error
+      errorEl.style.display = 'none';
 
       if (!raw) { input.focus(); return; }
 
-      // Parse "City, ST" or "City, State" or just "City"
+      // Require a comma
+      if (!raw.includes(',')) {
+        errorEl.textContent = 'Please enter city and state separated by a comma — example: Austin, TX';
+        errorEl.style.display = 'block';
+        input.focus();
+        return;
+      }
+
+      // Parse "City, ST" or "City, State"
       const parts = raw.split(',').map(s => s.trim());
       const cityName = parts[0];
       const stateRaw = parts[1] || '';
+
+      if (!cityName || !stateRaw) {
+        errorEl.textContent = 'Please enter city and state separated by a comma — example: Austin, TX';
+        errorEl.style.display = 'block';
+        input.focus();
+        return;
+      }
+
       // Normalize state to full name for comparison
       const stateUpper = stateRaw.toUpperCase();
       const stateFull = STATE_ABBREVS[stateUpper] || stateRaw;
@@ -547,9 +522,6 @@
 
         const label = `Showing sales near ${match.name}${match.admin1 ? ', ' + match.admin1 : ''}`;
         setLocationAndRender(match.latitude, match.longitude, label);
-
-        // Update GPS button to show it's not active
-        document.getElementById('gpsBtn').textContent = '📍 Use My Location';
       } catch (err) {
         statusEl.innerHTML = '<span class="dot dot-gray"></span> Search failed — try again';
       }
@@ -559,31 +531,11 @@
     }
 
     // -------------------------------------------------------------------------
-    // Init — fetch sales; auto-use GPS if already granted
+    // Init — fetch sales
     // -------------------------------------------------------------------------
     async function init() {
       const statusEl = document.getElementById('locationStatus');
-      statusEl.innerHTML = '<span class="dot dot-gray"></span> Use GPS or search a city to sort by distance';
-
-      // Check if we already have location permission (won't prompt)
-      if (navigator.permissions && navigator.permissions.query) {
-        try {
-          const perm = await navigator.permissions.query({ name: 'geolocation' });
-          if (perm.state === 'granted') {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                userLat = pos.coords.latitude;
-                userLon = pos.coords.longitude;
-                statusEl.innerHTML = '<span class="dot dot-green"></span> Showing sales nearest to you';
-                document.getElementById('gpsBtn').textContent = '📍 Using GPS';
-                if (cachedSales.length > 0) renderSales(cachedSales);
-              },
-              () => {},
-              { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }
-            );
-          }
-        } catch (e) { /* permissions API not supported */ }
-      }
+      statusEl.innerHTML = '<span class="dot dot-gray"></span> Search a city to sort sales by distance';
 
       try {
         const sales = await fetchSales();
