@@ -451,8 +451,9 @@
     // GPS handler
     // -------------------------------------------------------------------------
     function handleGps() {
-      const btn = document.getElementById('gpsBtn');
-      const statusEl = document.getElementById('locationStatus');
+      // Must call geolocation synchronously in the click handler — no async before this
+      var btn = document.getElementById('gpsBtn');
+      var statusEl = document.getElementById('locationStatus');
 
       if (!navigator.geolocation) {
         statusEl.innerHTML = '<span class="dot dot-gray"></span> GPS not available — try searching a city';
@@ -461,19 +462,24 @@
 
       btn.disabled = true;
       btn.textContent = '📍 Locating...';
+      statusEl.innerHTML = '<span class="dot dot-gray"></span> Getting your location...';
 
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        function(pos) {
           btn.textContent = '📍 Using GPS';
           btn.disabled = false;
           setLocationAndRender(pos.coords.latitude, pos.coords.longitude, 'Showing sales nearest to you');
         },
-        () => {
-          statusEl.innerHTML = '<span class="dot dot-gray"></span> Location denied — try searching a city';
+        function(err) {
+          var msg = 'Location failed';
+          if (err.code === 1) msg = 'Permission denied — try searching a city';
+          else if (err.code === 2) msg = 'Position unavailable — try searching a city';
+          else if (err.code === 3) msg = 'Location timed out — try searching a city';
+          statusEl.innerHTML = '<span class="dot dot-gray"></span> ' + msg;
           btn.textContent = '📍 Use My Location';
           btn.disabled = false;
         },
-        { timeout: 10000, enableHighAccuracy: true }
+        { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }
       );
     }
 
@@ -573,7 +579,7 @@
                 if (cachedSales.length > 0) renderSales(cachedSales);
               },
               () => {},
-              { timeout: 8000 }
+              { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }
             );
           }
         } catch (e) { /* permissions API not supported */ }
