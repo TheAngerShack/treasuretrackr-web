@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TreasureTrackr — Find Yard Sales Near You</title>
+  <meta name="description" content="Discover yard sales, estate sales, garage sales and more happening near you. Free to use, free to post." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><text y='28' font-size='28'>🧺</text></svg>" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #F5F5F5; color: #1A1A1A; }
+    a { text-decoration: none; color: inherit; }
+
+    /* Header */
+    .header { background: #4CAF50; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-emoji { font-size: 28px; }
+    .header-title { color: #fff; font-size: 22px; font-weight: 800; letter-spacing: 0.3px; }
+    .download-btn { background: #fff; color: #4CAF50; font-weight: 700; font-size: 14px; padding: 10px 20px; border-radius: 24px; border: none; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+    .download-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+    /* Hero */
+    .hero { text-align: center; padding: 40px 20px 24px; background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%); color: #fff; }
+    .hero h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+    .hero p { font-size: 16px; opacity: 0.9; max-width: 500px; margin: 0 auto; }
+
+    /* Location bar */
+    .location-bar { text-align: center; padding: 12px 20px; background: #fff; border-bottom: 1px solid #E0E0E0; font-size: 14px; color: #666; }
+    .location-bar .status { display: inline-flex; align-items: center; gap: 6px; }
+    .location-bar .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #4CAF50; }
+    .dot-gray { background: #9E9E9E; }
+
+    /* Container */
+    .container { max-width: 700px; margin: 0 auto; padding: 16px; }
+
+    /* Sale card */
+    .sale-card { background: #fff; border-radius: 12px; margin-bottom: 14px; overflow: hidden; border: 1px solid #E0E0E0; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+    .sale-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .sale-card.featured { border: 2px solid #FFD700; }
+    .featured-banner { background: #FFD700; text-align: center; padding: 4px 0; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #1A1A1A; }
+    .card-body { display: flex; padding: 14px; gap: 12px; }
+    .card-content { flex: 1; min-width: 0; }
+    .card-thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: #E5E7EB; flex-shrink: 0; align-self: center; }
+    .sale-type { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; }
+    .card-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-address { font-size: 13px; color: #666; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-distance { font-size: 13px; font-weight: 600; color: #4CAF50; margin-bottom: 2px; }
+    .card-date { font-size: 13px; color: #666; margin-bottom: 4px; }
+    .card-countdown { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .countdown-green { color: #4CAF50; }
+    .countdown-red { color: #F44336; }
+    .countdown-gray { color: #666; }
+    .category-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .category-chip { background: #F5F5F5; padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 500; color: #666; }
+    .store-buttons { display: flex; gap: 8px; }
+    .store-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #fff; border: none; cursor: pointer; }
+    .store-btn-google { background: #4CAF50; }
+    .store-btn-apple { background: #2196F3; }
+
+    /* Loading / empty */
+    .loading { text-align: center; padding: 60px 20px; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #E0E0E0; border-top-color: #4CAF50; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+
+    /* Footer */
+    .footer { text-align: center; padding: 32px 20px; border-top: 1px solid #E0E0E0; background: #fff; margin-top: 20px; }
+    .footer a { color: #4CAF50; font-weight: 600; }
+    .footer p { font-size: 13px; color: #666; margin-bottom: 6px; }
+
+    /* Privacy page (hidden by default) */
+    .privacy-page { display: none; max-width: 700px; margin: 0 auto; padding: 24px 20px 60px; }
+    .privacy-page h1 { font-size: 24px; font-weight: 800; margin-bottom: 16px; }
+    .privacy-page h2 { font-size: 18px; font-weight: 700; margin: 20px 0 8px; }
+    .privacy-page p, .privacy-page li { font-size: 15px; line-height: 1.6; color: #333; margin-bottom: 8px; }
+    .privacy-page ul { padding-left: 20px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #4CAF50; font-weight: 600; font-size: 15px; }
+
+    @media (max-width: 480px) {
+      .header { padding: 12px 14px; }
+      .header-title { font-size: 18px; }
+      .download-btn { padding: 8px 16px; font-size: 13px; }
+      .hero h1 { font-size: 22px; }
+      .hero p { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <span class="header-emoji">🧺</span>
+      <span class="header-title">TreasureTrackr</span>
+    </div>
+    <a id="headerDownloadBtn" href="#" class="download-btn">Download App</a>
+  </header>
+
+  <!-- Main content page -->
+  <div id="mainPage">
+    <div class="hero">
+      <h1>Find Yard Sales Near You</h1>
+      <p>Discover yard sales, estate sales, garage sales and more happening in your area. Free to use, free to post.</p>
+    </div>
+
+    <div class="location-bar">
+      <span class="status" id="locationStatus">
+        <span class="dot dot-gray"></span>
+        Requesting your location...
+      </span>
+    </div>
+
+    <div class="container">
+      <div id="salesList">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Loading sales near you...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy page -->
+  <div id="privacyPage" class="privacy-page">
+    <a href="#" class="back-link" onclick="showMain(); return false;">&#8592; Back to Sales</a>
+    <h1>Privacy Policy</h1>
+    <p><strong>Last updated:</strong> March 20, 2026</p>
+
+    <h2>Information We Collect</h2>
+    <p>TreasureTrackr collects minimal information to provide you with the best experience:</p>
+    <ul>
+      <li><strong>Location data:</strong> When you grant permission, we use your device location to show nearby sales and calculate distances. This data is processed on your device and is not stored on our servers.</li>
+      <li><strong>Sale listings:</strong> When you post a sale, we store the title, address, date, time, categories, items, and photos you provide.</li>
+      <li><strong>Favorites and route data:</strong> Stored locally on your device using AsyncStorage. We do not have access to this data.</li>
+    </ul>
+
+    <h2>How We Use Your Information</h2>
+    <ul>
+      <li>To display nearby sales sorted by distance</li>
+      <li>To publish your sale listings so others can find them</li>
+      <li>To improve the app experience</li>
+    </ul>
+
+    <h2>Data Sharing</h2>
+    <p>We do not sell, trade, or share your personal information with third parties. Sale listings are publicly visible to all app users.</p>
+
+    <h2>Data Storage</h2>
+    <p>Sale data is stored securely on Supabase servers. Local preferences (favorites, route stops, drafts) are stored only on your device.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>TreasureTrackr is not directed at children under 13. We do not knowingly collect information from children.</p>
+
+    <h2>Contact Us</h2>
+    <p>If you have questions about this privacy policy, contact us at <a href="mailto:support@treasuretrackr.com">support@treasuretrackr.com</a>.</p>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p><a href="#" onclick="showPrivacy(); return false;">Privacy Policy</a></p>
+    <p>Questions? <a href="mailto:support@treasuretrackr.com">support@treasuretrackr.com</a></p>
+    <p>&copy; 2026 TreasureTrackr. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // Config
+    // -------------------------------------------------------------------------
+    const SUPABASE_URL = 'https://zcibitnqwcjzfzvkbgfi.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjaWJpdG5xd2NqemZ6dmtiZ2ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MDI3ODIsImV4cCI6MjA4OTI3ODc4Mn0.VHfiRy25fY0_RCbN5PIgs4thMatc36EvMVGznQYlklc';
+    const GOOGLE_PLAY = 'https://play.google.com/store/apps/details?id=com.kofibear.treasuretrackr';
+    const APP_STORE = 'https://apps.apple.com/app/treasuretrackr/id000000000';
+
+    const SALE_TYPES = {
+      yard_sale: { label: 'Yard Sale', emoji: '🧺' },
+      estate_sale: { label: 'Estate Sale', emoji: '🏠' },
+      garage_sale: { label: 'Garage Sale', emoji: '🚗' },
+      church_sale: { label: 'Church Sale', emoji: '⛪' },
+      farmers_market: { label: 'Farmers Market', emoji: '🌽' },
+      flea_market: { label: 'Flea Market', emoji: '🏪' },
+      food_business: { label: 'Food', emoji: '🍽️' },
+      bake_sale: { label: 'Bake Sale', emoji: '🧁' },
+      girl_scout: { label: 'Girl Scouts', emoji: '🍪' },
+      boy_scout: { label: 'Boy Scouts', emoji: '⚜️' },
+      car_wash: { label: 'Car Wash', emoji: '🚗' },
+      fundraiser: { label: 'Fundraiser', emoji: '🎗️' },
+    };
+
+    const DEFAULT_THUMB = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=100';
+
+    // -------------------------------------------------------------------------
+    // Detect platform & set download links
+    // -------------------------------------------------------------------------
+    function getStoreUrl() {
+      const ua = navigator.userAgent || '';
+      if (/iPhone|iPad|iPod/i.test(ua)) return APP_STORE;
+      return GOOGLE_PLAY;
+    }
+
+    function isIOS() {
+      return /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+    }
+
+    document.getElementById('headerDownloadBtn').href = getStoreUrl();
+
+    // -------------------------------------------------------------------------
+    // Haversine distance in miles
+    // -------------------------------------------------------------------------
+    function haversineMiles(lat1, lon1, lat2, lon2) {
+      const toRad = (d) => (d * Math.PI) / 180;
+      const R = 3958.8;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // -------------------------------------------------------------------------
+    // Countdown timer
+    // -------------------------------------------------------------------------
+    function getCountdown(dateStr, startTime, endTime) {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+
+      if (!dateStr || !startTime) return { text: '', cls: '' };
+
+      const startDT = new Date(dateStr + 'T' + startTime + ':00');
+      const endDT = endTime ? new Date(dateStr + 'T' + endTime + ':00') : null;
+
+      if (dateStr === today && endDT && now > endDT) return { text: 'Ended', cls: 'countdown-red' };
+      if (dateStr === today && now >= startDT && endDT && now <= endDT) return { text: 'Happening Now!', cls: 'countdown-green' };
+      if (dateStr < today) return { text: '', cls: '' };
+
+      const diff = startDT - now;
+      if (diff <= 0) return { text: '', cls: '' };
+
+      const hours = Math.floor(diff / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+
+      if (hours < 1) return { text: `Starts in ${mins}m`, cls: 'countdown-green' };
+      if (hours < 24) return { text: `Starts in ${hours}h ${mins}m`, cls: 'countdown-green' };
+
+      const days = Math.floor(hours / 24);
+      return { text: `In ${days} day${days > 1 ? 's' : ''}`, cls: 'countdown-gray' };
+    }
+
+    // -------------------------------------------------------------------------
+    // Format helpers
+    // -------------------------------------------------------------------------
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T12:00:00');
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const today = new Date().toISOString().slice(0, 10);
+      const tmrw = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      let prefix = days[d.getDay()];
+      if (dateStr === today) prefix = 'Today';
+      else if (dateStr === tmrw) prefix = 'Tomorrow';
+      return `${prefix}, ${months[d.getMonth()]} ${d.getDate()}`;
+    }
+
+    function formatTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':').map(Number);
+      const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+
+    // -------------------------------------------------------------------------
+    // Render sale card
+    // -------------------------------------------------------------------------
+    function renderCard(sale) {
+      const st = SALE_TYPES[sale.sale_type] || { label: sale.sale_type, emoji: '🧺' };
+      const thumb = (sale.photos && sale.photos.length > 0) ? sale.photos[0] : DEFAULT_THUMB;
+      const countdown = getCountdown(sale.date, sale.start_time, sale.end_time);
+      const storeUrl = getStoreUrl();
+
+      let distHtml = '';
+      if (sale._distanceMiles != null) {
+        const d = sale._distanceMiles;
+        distHtml = `<div class="card-distance">${d < 0.1 ? 'Less than 0.1 miles away' : d.toFixed(1) + ' miles away'}</div>`;
+      }
+
+      let countdownHtml = '';
+      if (countdown.text) {
+        countdownHtml = `<div class="card-countdown ${countdown.cls}">${countdown.text}</div>`;
+      }
+
+      let catsHtml = '';
+      if (sale.categories && sale.categories.length > 0) {
+        catsHtml = '<div class="category-row">' +
+          sale.categories.slice(0, 4).map(c => `<span class="category-chip">${esc(c)}</span>`).join('') +
+          '</div>';
+      }
+
+      return `
+        <a href="${storeUrl}" class="sale-card ${sale.is_featured ? 'featured' : ''}" target="_blank" rel="noopener">
+          ${sale.is_featured ? '<div class="featured-banner">FEATURED</div>' : ''}
+          <div class="card-body">
+            <div class="card-content">
+              <div class="sale-type">${st.emoji} ${esc(st.label)}</div>
+              <div class="card-title">${esc(sale.title)}</div>
+              <div class="card-address">${esc(sale.address || '')}</div>
+              ${distHtml}
+              <div class="card-date">${formatDate(sale.date)} ${formatTime(sale.start_time)}${sale.end_time ? ' - ' + formatTime(sale.end_time) : ''}</div>
+              ${countdownHtml}
+              ${catsHtml}
+              <div class="store-buttons">
+                <span class="store-btn store-btn-google">▶ Google Play</span>
+                <span class="store-btn store-btn-apple"> App Store</span>
+              </div>
+            </div>
+            <img class="card-thumb" src="${esc(thumb)}" alt="" loading="lazy" onerror="this.style.display='none'" />
+          </div>
+        </a>
+      `;
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+    function showPrivacy() {
+      document.getElementById('mainPage').style.display = 'none';
+      document.getElementById('privacyPage').style.display = 'block';
+      window.scrollTo(0, 0);
+      history.pushState(null, '', '/privacy');
+    }
+
+    function showMain() {
+      document.getElementById('privacyPage').style.display = 'none';
+      document.getElementById('mainPage').style.display = 'block';
+      window.scrollTo(0, 0);
+      history.pushState(null, '', '/');
+    }
+
+    // Handle direct /privacy URL and browser back
+    if (window.location.pathname === '/privacy') {
+      document.getElementById('mainPage').style.display = 'none';
+      document.getElementById('privacyPage').style.display = 'block';
+    }
+    window.addEventListener('popstate', () => {
+      if (window.location.pathname === '/privacy') showPrivacy();
+      else showMain();
+    });
+
+    // -------------------------------------------------------------------------
+    // Fetch sales & render
+    // -------------------------------------------------------------------------
+    let userLat = null;
+    let userLon = null;
+
+    async function fetchSales() {
+      const today = new Date().toISOString().slice(0, 10);
+      const url = `${SUPABASE_URL}/rest/v1/sales?is_published=eq.true&status=eq.active&date=gte.${today}&order=is_featured.desc,date.asc&limit=100`;
+
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+
+      if (!res.ok) throw new Error('Failed to fetch sales');
+      return res.json();
+    }
+
+    function renderSales(sales) {
+      const list = document.getElementById('salesList');
+
+      // Compute distances
+      sales.forEach(sale => {
+        if (userLat != null && userLon != null && sale.latitude && sale.longitude) {
+          sale._distanceMiles = haversineMiles(userLat, userLon, sale.latitude, sale.longitude);
+        } else {
+          sale._distanceMiles = null;
+        }
+      });
+
+      // Sort: featured first, then distance (if available), then date
+      sales.sort((a, b) => {
+        if (a.is_featured && !b.is_featured) return -1;
+        if (!a.is_featured && b.is_featured) return 1;
+        if (userLat != null) {
+          const da = a._distanceMiles ?? Infinity;
+          const db = b._distanceMiles ?? Infinity;
+          if (da !== db) return da - db;
+        }
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        return 0;
+      });
+
+      if (sales.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="emoji">🧺</div>
+            <p>No sales found nearby. Check back soon!</p>
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = sales.map(renderCard).join('');
+    }
+
+    // -------------------------------------------------------------------------
+    // Init
+    // -------------------------------------------------------------------------
+    async function init() {
+      const statusEl = document.getElementById('locationStatus');
+
+      // Request location
+      const locationPromise = new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          statusEl.innerHTML = '<span class="dot dot-gray"></span> Location unavailable — showing all sales';
+          resolve();
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            userLat = pos.coords.latitude;
+            userLon = pos.coords.longitude;
+            statusEl.innerHTML = '<span class="dot dot-green"></span> Showing sales nearest to you';
+            resolve();
+          },
+          () => {
+            statusEl.innerHTML = '<span class="dot dot-gray"></span> Location denied — sorted by date';
+            resolve();
+          },
+          { timeout: 8000, enableHighAccuracy: false }
+        );
+      });
+
+      // Fetch sales in parallel with location
+      const salesPromise = fetchSales();
+
+      try {
+        const [, sales] = await Promise.all([locationPromise, salesPromise]);
+        renderSales(sales);
+      } catch (err) {
+        document.getElementById('salesList').innerHTML = `
+          <div class="empty-state">
+            <div class="emoji">😕</div>
+            <p>Could not load sales. Please try again later.</p>
+          </div>`;
+      }
+
+      // Refresh countdowns every 30s
+      setInterval(() => {
+        document.querySelectorAll('.sale-card').forEach(card => {
+          // Countdowns update on re-render; simple page refresh approach
+        });
+      }, 30000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
